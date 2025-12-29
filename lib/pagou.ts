@@ -73,19 +73,24 @@ export async function createPixPayment(data: CreatePixPaymentRequest): Promise<P
     throw new Error("PAGOU_SECRET_KEY não configurada")
   }
 
+  const trimmedKey = apiKey.trim()
+
   const apiUrl = getApiUrl()
   const endpoint = `${apiUrl}/v1/pix`
 
   console.log("[v0] Creating PIX payment:", {
     endpoint,
     amount: data.amount,
-    keyPrefix: apiKey.substring(0, 15) + "...",
+    keyLength: trimmedKey.length,
+    keyPrefix: trimmedKey.substring(0, 10),
+    keySuffix: trimmedKey.substring(trimmedKey.length - 5),
+    hasWhitespace: apiKey !== trimmedKey,
   })
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "X-API-KEY": apiKey,
+      "X-API-KEY": trimmedKey,
       "Content-Type": "application/json",
       "User-Agent": "usecalistar/1.0",
     },
@@ -120,12 +125,13 @@ export async function getPixPaymentStatus(qrcodeId: string): Promise<PixPaymentR
     throw new Error("PAGOU_SECRET_KEY não configurada")
   }
 
+  const trimmedKey = apiKey.trim()
   const apiUrl = getApiUrl()
 
   const response = await fetch(`${apiUrl}/v1/pix/${qrcodeId}`, {
     method: "GET",
     headers: {
-      "X-API-KEY": apiKey,
+      "X-API-KEY": trimmedKey,
       "Content-Type": "application/json",
       "User-Agent": "usecalistar/1.0",
     },
