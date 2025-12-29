@@ -6,6 +6,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { amount, items, customer } = body
 
+    console.log("[v0] Checkout request received:", {
+      amount,
+      itemsCount: items?.length,
+      customerName: customer?.name,
+      hasSecretKey: !!process.env.PAGOU_SECRET_KEY,
+      keyLength: process.env.PAGOU_SECRET_KEY?.length,
+    })
+
     // Validate required fields
     if (!amount || amount < 5) {
       return NextResponse.json({ error: "Valor mínimo é R$ 5,00" }, { status: 400 })
@@ -32,9 +40,13 @@ export async function POST(request: NextRequest) {
       ? `${process.env.NEXT_PUBLIC_APP_URL}/api/checkout/webhook`
       : undefined
 
+    console.log("[v0] Webhook URL:", webhookUrl)
+
+    const roundedAmount = Math.round(amount * 100) / 100
+
     // Create PIX payment via Pagou API
     const pixPayment = await createPixPayment({
-      amount: Number(amount.toFixed(2)),
+      amount: roundedAmount,
       description,
       expiration: 3600, // 1 hour
       payer: {
@@ -50,6 +62,8 @@ export async function POST(request: NextRequest) {
       customer_code: customer.email || orderId,
     })
 
+    console.log("[v0] PIX payment created successfully:", pixPayment.id)
+
     return NextResponse.json({
       success: true,
       payment: {
@@ -62,7 +76,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Erro ao criar pagamento PIX:", error)
+    console.error("[v0] Erro ao criar pagamento PIX:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Erro ao processar pagamento" },
       { status: 500 },
