@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valor mínimo é R$ 5,00" }, { status: 400 })
     }
 
-    if (!customer?.name || !customer?.document) {
-      return NextResponse.json({ error: "Nome e CPF são obrigatórios" }, { status: 400 })
+    if (!customer?.name || !customer?.document || !customer?.email) {
+      return NextResponse.json({ error: "Nome, email e CPF são obrigatórios" }, { status: 400 })
     }
 
     // Clean and validate CPF
@@ -29,37 +29,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "CPF inválido" }, { status: 400 })
     }
 
-    // Build description from items
-    const description = items?.length > 0 ? `Compra usecalistar - ${items.length} item(s)` : "Compra usecalistar"
-
     // Create order ID
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
-    // Get webhook URL from environment or build it
-    const webhookUrl = process.env.NEXT_PUBLIC_APP_URL
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/api/checkout/webhook`
-      : undefined
-
-    console.log("[v0] Webhook URL:", webhookUrl)
-
     const roundedAmount = Math.round(amount * 100) / 100
 
-    // Create PIX payment via Pagou API
     const pixPayment = await createPixPayment({
       amount: roundedAmount,
-      description,
-      expiration: 3600, // 1 hour
+      payerQuestion: `Compra Calistar - ${items?.length || 1} item(s)`,
+      external_id: orderId,
       payer: {
         name: customer.name,
+        email: customer.email,
         document: cleanDocument,
       },
-      metadata: [
-        { key: "order_id", value: orderId },
-        { key: "customer_email", value: customer.email || "" },
-        { key: "customer_phone", value: customer.phone || "" },
-      ],
-      notification_url: webhookUrl,
-      customer_code: customer.email || orderId,
     })
 
     console.log("[v0] PIX payment created successfully:", pixPayment.id)
@@ -70,8 +53,10 @@ export async function POST(request: NextRequest) {
         id: pixPayment.id,
         orderId,
         amount: pixPayment.amount,
-        pixCode: pixPayment.payload.data,
-        qrCodeImage: pixPayment.payload.image,
+        pixCode: pixPayment.pix_qr_code,
+        qrCodeImage: pixPayment.pix_qr_code_base64.startsWith("data:")
+          ? pixPayment.pix_qr_code_base64
+          : `data:image/png;base64,${pixPayment.pix_qr_code_base64}`,
         expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
       },
     })

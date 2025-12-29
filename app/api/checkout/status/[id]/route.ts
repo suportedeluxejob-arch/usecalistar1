@@ -2,17 +2,17 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getPixPaymentStatus } from "@/lib/pagou"
 
 // Status mapping from Pagou API
-const STATUS_MAP: Record<number, string> = {
-  1: "empty",
-  2: "active",
-  3: "canceled",
-  4: "completed",
-  5: "refunded",
+const STATUS_MAP: Record<string, string> = {
+  "1": "empty",
+  "2": "active",
+  "3": "canceled",
+  "4": "completed",
+  "5": "refunded",
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
 
     if (!id) {
       return NextResponse.json({ error: "ID do pagamento não fornecido" }, { status: 400 })
@@ -21,12 +21,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const payment = await getPixPaymentStatus(id)
     const statusName = STATUS_MAP[payment.status] || "unknown"
 
+    const isPaid = payment.status === "completed" || payment.status === "paid"
+
     return NextResponse.json({
       id: payment.id,
       status: statusName,
       statusCode: payment.status,
       amount: payment.amount,
-      paid: payment.status === 4, // StatusCompleted
+      paid: isPaid,
     })
   } catch (error) {
     console.error("Erro ao consultar status:", error)

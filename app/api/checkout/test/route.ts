@@ -10,26 +10,20 @@ export async function GET() {
   const isProduction = apiKey.startsWith("sk_live_")
   const baseUrl = isProduction ? "https://api.pagou.com.br" : "https://sandbox.api.pagou.com.br"
 
+  const url = "https://api.pagou.ai/api/transaction"
+
   const testPayload = {
     amount: 10.0,
-    description: "Teste de integração",
-    expiration: 3600,
-    external_reference: `test_${Date.now()}`,
+    payerQuestion: "Teste de integração",
+    external_id: `test_${Date.now()}`,
     payer: {
       name: "Teste Cliente",
-      document: "12345678909",
       email: "teste@teste.com",
+      document: "12345678909",
     },
   }
 
-  const url = `${baseUrl}/v1/pix`
-
-  const authMethods = [
-    { name: "X-API-KEY", headers: { "X-API-KEY": apiKey } },
-    { name: "Authorization Bearer", headers: { Authorization: `Bearer ${apiKey}` } },
-    { name: "api-key", headers: { "api-key": apiKey } },
-    { name: "x-api-key lowercase", headers: { "x-api-key": apiKey } },
-  ]
+  const authMethods = [{ name: "Authorization Bearer", headers: { Authorization: `Bearer ${apiKey}` } }]
 
   const results: Record<string, unknown>[] = []
 
