@@ -56,8 +56,15 @@ export interface WebhookPayload {
   }
 }
 
-const PAGOU_API_URL =
-  process.env.NODE_ENV === "production" ? "https://api.pagou.com.br" : "https://sandbox.api.pagou.com.br"
+function getApiUrl(): string {
+  const apiKey = process.env.PAGOU_SECRET_KEY || ""
+  // If key starts with sk_live_, use production API
+  if (apiKey.startsWith("sk_live_")) {
+    return "https://api.pagou.com.br"
+  }
+  // Otherwise use sandbox
+  return "https://sandbox.api.pagou.com.br"
+}
 
 export async function createPixPayment(data: CreatePixPaymentRequest): Promise<PixPaymentResponse> {
   const apiKey = process.env.PAGOU_SECRET_KEY
@@ -66,7 +73,16 @@ export async function createPixPayment(data: CreatePixPaymentRequest): Promise<P
     throw new Error("PAGOU_SECRET_KEY não configurada")
   }
 
-  const response = await fetch(`${PAGOU_API_URL}/v1/pix`, {
+  const apiUrl = getApiUrl()
+  const endpoint = `${apiUrl}/v1/pix`
+
+  console.log("[v0] Creating PIX payment:", {
+    endpoint,
+    amount: data.amount,
+    keyPrefix: apiKey.substring(0, 15) + "...",
+  })
+
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "X-API-KEY": apiKey,
@@ -76,12 +92,25 @@ export async function createPixPayment(data: CreatePixPaymentRequest): Promise<P
     body: JSON.stringify(data),
   })
 
+  const responseText = await response.text()
+  console.log("[v0] Pagou API response:", {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseText.substring(0, 500),
+  })
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Unknown error" }))
-    throw new Error(error.error || `Erro ao criar pagamento PIX: ${response.status}`)
+    let errorMessage = `Erro ao criar pagamento PIX: ${response.status}`
+    try {
+      const error = JSON.parse(responseText)
+      errorMessage = error.error || error.message || errorMessage
+    } catch {
+      // Response is not JSON
+    }
+    throw new Error(errorMessage)
   }
 
-  return response.json()
+  return JSON.parse(responseText)
 }
 
 export async function getPixPaymentStatus(qrcodeId: string): Promise<PixPaymentResponse & { status: number }> {
@@ -91,7 +120,9 @@ export async function getPixPaymentStatus(qrcodeId: string): Promise<PixPaymentR
     throw new Error("PAGOU_SECRET_KEY não configurada")
   }
 
-  const response = await fetch(`${PAGOU_API_URL}/v1/pix/${qrcodeId}`, {
+  const apiUrl = getApiUrl()
+
+  const response = await fetch(`${apiUrl}/v1/pix/${qrcodeId}`, {
     method: "GET",
     headers: {
       "X-API-KEY": apiKey,
